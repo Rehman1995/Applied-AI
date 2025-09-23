@@ -1,0 +1,42 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.datasets import make_blobs
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
+
+sns.set(style="whitegrid")
+
+# Create 2D data with 3 true clusters
+X, y_true = make_blobs(n_samples=300, centers=3, cluster_std=1.0, random_state=42)
+
+# Plot true labels (for teaching)
+plt.figure(figsize=(6, 5))
+plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='Set1', s=50)
+plt.title("True Clusters (Labeled for Teaching)")
+plt.xlabel("Feature 1")
+plt.ylabel("Feature 2")
+plt.show()
+
+# Fit KMeans with 3 clusters (no labels used)
+kmeans = KMeans(n_clusters=3, random_state=42)
+clusters = kmeans.fit_predict(X)
+
+# Cluster centers
+centers = kmeans.cluster_centers_
+
+# Plot KMeans clustering result
+plt.figure(figsize=(6, 5))
+plt.scatter(X[:, 0], X[:, 1], c=clusters, cmap='Set2', s=50)
+plt.scatter(centers[:, 0], centers[:, 1], c='black', s=200, marker='X', label='Centers')
+plt.title("KMeans Clustering (Unsupervised)")
+plt.xlabel("Feature 1")
+plt.ylabel("Feature 2")
+plt.legend()
+plt.show()
+
+
+# Compare with true labels
+ari = adjusted_rand_score(y_true, clusters)
+print(f"Adjusted Rand Index (Similarity to True Labels): {ari:.2f}")
