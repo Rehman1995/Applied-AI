@@ -1,20 +1,18 @@
-# GAN on Fashion-MNIST with inline visualizations
 import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Load Fashion-MNIST
+# Load MNIST and limit dataset
 (x_train, _), (_, _) = tf.keras.datasets.mnist.load_data()
-x_train= x_train[:500]
-x_train = x_train.astype('float32') / 255.0
+x_train = x_train[:10000].astype('float32') / 255.0  # use first 10k images
 x_train = np.expand_dims(x_train, axis=-1)
 
-BUFFER_SIZE = 60000
-BATCH_SIZE = 256
+BUFFER_SIZE = 10000
+BATCH_SIZE = 64
 LATENT_DIM = 100
-EPOCHS = 10
-SAVE_EVERY = 2
+EPOCHS = 5
+SAVE_EVERY = 1  # visualize every epoch
 
 train_dataset = tf.data.Dataset.from_tensor_slices(x_train).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
 
@@ -24,24 +22,24 @@ def make_generator_model():
         layers.Dense(7*7*256, use_bias=False, input_shape=(LATENT_DIM,)),
         layers.BatchNormalization(),
         layers.LeakyReLU(),
-        layers.Reshape((7, 7, 256)),
-        layers.Conv2DTranspose(128, (5,5), strides=(1,1), padding='same', use_bias=False),
+        layers.Reshape((7,7,256)),
+        layers.Conv2DTranspose(128, 5, strides=1, padding='same', use_bias=False),
         layers.BatchNormalization(),
         layers.LeakyReLU(),
-        layers.Conv2DTranspose(64, (5,5), strides=(2,2), padding='same', use_bias=False),
+        layers.Conv2DTranspose(64, 5, strides=2, padding='same', use_bias=False),
         layers.BatchNormalization(),
         layers.LeakyReLU(),
-        layers.Conv2DTranspose(1, (5,5), strides=(2,2), padding='same', use_bias=False, activation='tanh')
+        layers.Conv2DTranspose(1, 5, strides=2, padding='same', use_bias=False, activation='tanh')
     ])
     return model
 
 # Discriminator
 def make_discriminator_model():
     model = tf.keras.Sequential([
-        layers.Conv2D(64, (5,5), strides=(2,2), padding='same', input_shape=[28,28,1]),
+        layers.Conv2D(64, 5, strides=2, padding='same', input_shape=[28,28,1]),
         layers.LeakyReLU(),
         layers.Dropout(0.3),
-        layers.Conv2D(128, (5,5), strides=(2,2), padding='same'),
+        layers.Conv2D(128, 5, strides=2, padding='same'),
         layers.LeakyReLU(),
         layers.Dropout(0.3),
         layers.Flatten(),
@@ -65,7 +63,7 @@ def generator_loss(fake_output):
 generator_optimizer = tf.keras.optimizers.Adam(1e-4)
 discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
 
-# Training loop
+# Training step
 @tf.function
 def train_step(images):
     noise = tf.random.normal([BATCH_SIZE, LATENT_DIM])
@@ -81,30 +79,27 @@ def train_step(images):
     discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
     return gen_loss, disc_loss
 
-# Training function with inline visualization
-def train(dataset, epochs):
-    for epoch in range(epochs):
-        gen_loss_list = []
-        disc_loss_list = []
-        for image_batch in dataset:
-            gl, dl = train_step(image_batch)
-            gen_loss_list.append(gl.numpy())
-            disc_loss_list.append(dl.numpy())
-        print(f'Epoch {epoch+1}, Generator Loss: {np.mean(gen_loss_list):.4f}, Discriminator Loss: {np.mean(disc_loss_list):.4f}')
-        
-        if (epoch+1) % SAVE_EVERY == 0:
-            visualize(epoch+1)
-
-# Visualization function
+# Visualization
 def visualize(epoch):
     noise = tf.random.normal([16, LATENT_DIM])
     generated_images = generator(noise, training=False)
-    generated_images = (generated_images + 1)/2.0  # rescale to [0,1]
+    generated_images = (generated_images + 1)/2.0
     fig, axes = plt.subplots(4,4, figsize=(4,4))
     for i, ax in enumerate(axes.flatten()):
-        ax.imshow(generated_images[i, :, :, 0], cmap='gray')
+        ax.imshow(generated_images[i,:,:,0], cmap='gray')
         ax.axis('off')
     plt.suptitle(f'Generated Images at Epoch {epoch}')
     plt.show()
+
+# Training loop
+def train(dataset, epochs):
+    for epoch in range(epochs):
+        gen_losses, disc_losses = [], []
+        for batch in dataset:
+            gl, dl = train_step(batch)
+            gen_losses.append(gl.numpy())
+            disc_losses.append(dl.numpy())
+        print(f'Epoch {epoch+1}, G_loss={np.mean(gen_losses):.4f}, D_loss={np.mean(disc_losses):.4f}')
+        visualize(epoch+1)
 
 train(train_dataset, EPOCHS)
